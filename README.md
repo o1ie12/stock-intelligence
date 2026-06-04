@@ -4,6 +4,7 @@
 
 **Status:** **Live on Streamlit Cloud** | **Multi-User** | **No Installation Required**
 
+**Note:** **This is exclusively for NextGen MAT Business Club Members**
 ---
 
 ## **For Users: Just Visit and Use!**
