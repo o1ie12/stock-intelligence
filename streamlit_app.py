@@ -34,6 +34,7 @@ from portfolio_engine import (
     generate_decision_explanation,
     construct_target_portfolio,
     build_model_target_portfolio,
+    load_model_changes,
     fetch_current_prices,
 )
 
@@ -634,14 +635,7 @@ with tab_model:
     st.subheader("Model Change Log")
     st.markdown("Tracks all position changes made during rebalancing events.")
 
-    try:
-        from portfolio_engine import MODEL_CHANGES_FILE
-        if MODEL_CHANGES_FILE.exists():
-            changes = json.loads(MODEL_CHANGES_FILE.read_text())
-        else:
-            changes = []
-    except Exception:
-        changes = []
+    changes = load_model_changes()
 
     if changes:
         changes_df = pd.DataFrame(changes)
