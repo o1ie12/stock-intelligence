@@ -6,7 +6,7 @@ A factor-based stock analysis tool that ranks stocks and builds a simulated port
 
 The Stock Intelligence System is an educational project that demonstrates factor-based investing concepts. It generates a ranked list of stocks, constructs a model portfolio, and evaluates performance using historical backtesting against the SPY benchmark.
 
-**⚠️ Disclaimer:** This project is for educational use only. It does not provide financial advice or trading recommendations.
+**Disclaimer:** This project is for educational use only. It does not provide financial advice or trading recommendations.
 
 ## Features
 
