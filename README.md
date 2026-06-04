@@ -1,14 +1,12 @@
 # Stock Intelligence System
 
-![Streamlit App](https://static.streamlit.io/badges/streamlit_app badge.svg)](https://share.streamlit.io)
+**LIVE APP:** https://stock-intelligence-nextgen.streamlit.app/
 
-**🌐 LIVE APP:** https://your-app-name.streamlit.app
-
-**Status:** ✅ **Live on Streamlit Cloud** | **Multi-User** | **No Installation Required**
+**Status:** **Live on Streamlit Cloud** | **Multi-User** | **No Installation Required**
 
 ---
 
-## 🚀 **For Users: Just Visit and Use!**
+## **For Users: Just Visit and Use!**
 
 **No installation required!** Just visit the live app URL above and start using it.
 
@@ -20,7 +18,7 @@
 
 ---
 
-## 📖 **What It Does**
+## **What It Does**
 
 The Stock Intelligence System is an educational tool that helps you understand factor-based investing. It:
 
@@ -30,13 +28,13 @@ The Stock Intelligence System is an educational tool that helps you understand f
 - **Tracks performance** against the SPY benchmark
 - **Enables investment club collaboration** with multi-user portfolio management
 
-**⚠️ Educational Disclaimer:** This project is for educational purposes only. It does not provide financial advice or trading recommendations.
+**Educational Disclaimer:** This project is for educational purposes only. It does not provide financial advice or trading recommendations.
 
 ---
 
-## 🎯 **Key Features**
+## **Key Features**
 
-- **🌐 Multi-User Cloud Deployment:** Access from anywhere, share with friends
+- **Multi-User Cloud Deployment:** Access from anywhere, share with friends
 - **Factor-Based Stock Scoring:** Uses Momentum, ROE, and P/E ratios to rank stocks
 - **Automated Portfolio Construction:** Selects top 5 stocks with smart weighting
 - **Investment Club Dashboard:** Track portfolios, compare performance, see leaderboards
@@ -46,7 +44,7 @@ The Stock Intelligence System is an educational tool that helps you understand f
 
 ---
 
-## 👨‍💻 **For Developers: Local Development Setup**
+## **For Developers: Local Development Setup**
 
 If you're a developer wanting to run this locally or contribute to the code, follow these steps:
 
@@ -91,7 +89,7 @@ The app will be available at `http://localhost:8501`
 
 ---
 
-## 🏗️ **Architecture**
+## **Architecture**
 
 The system uses a unified portfolio construction approach to ensure mathematical consistency:
 
@@ -104,7 +102,7 @@ The system uses a unified portfolio construction approach to ensure mathematical
 
 ---
 
-## 🌐 **Cloud Deployment**
+## **Cloud Deployment**
 
 The Stock Intelligence System is deployed on **Streamlit Cloud** with **Supabase** database backend.
 
@@ -144,7 +142,7 @@ The Stock Intelligence System is deployed on **Streamlit Cloud** with **Supabase
 
 ---
 
-## 📊 **How It Works**
+## **How It Works**
 
 1. **Stock Scoring**: Stocks are scored using 3 factors
    - **Momentum** (40% weight): 6-month price momentum
@@ -162,7 +160,7 @@ The Stock Intelligence System is deployed on **Streamlit Cloud** with **Supabase
 
 ---
 
-## 📈 **Stock Universe**
+## **Stock Universe**
 
 The current implementation uses a focused universe of 4 semiconductor stocks:
 - NVDA (NVIDIA)
@@ -174,7 +172,7 @@ The current implementation uses a focused universe of 4 semiconductor stocks:
 
 ---
 
-## 🔑 **Key Concepts**
+## **Key Concepts**
 
 ### Factor Scoring
 
@@ -200,7 +198,7 @@ The system uses exponential weighting to emphasize high-scoring stocks:
 
 ---
 
-## 📁 **Project Structure**
+## **Project Structure**
 
 ```
 stock-intelligence/
@@ -224,9 +222,9 @@ stock-intelligence/
 
 ---
 
-## 🚀 **Recent Updates**
+## **Recent Updates**
 
-### **Phase 3: Cloud Database Integration & Multi-User Deployment** ✅
+### **Phase 3: Cloud Database Integration & Multi-User Deployment**
 
 **Achievements:**
 - Migrated from local JSON files to Supabase cloud database
@@ -254,12 +252,12 @@ stock-intelligence/
 
 ---
 
-## 📜 **Disclaimer**
+## **Disclaimer**
 
 **IMPORTANT:** This project is for educational purposes only. It is not intended to provide financial advice, investment recommendations, or trading guidance. The results shown are based on historical data and do not guarantee future performance. Always consult with a qualified financial advisor before making investment decisions.
 
 ---
 
-## 📄 **License**
+## **License**
 
 This project is provided as-is for educational use.
