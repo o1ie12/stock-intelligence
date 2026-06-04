@@ -1,0 +1,34 @@
+[
+  {
+    "timestamp": "2026-06-01 09:00:00",
+    "member": "Oliver",
+    "ticker": "NVDA",
+    "action": "BUY",
+    "shares": 8.0,
+    "price": 120.0
+  },
+  {
+    "timestamp": "2026-06-01 09:00:00",
+    "member": "Oliver",
+    "ticker": "AMD",
+    "action": "BUY",
+    "shares": 12.0,
+    "price": 150.0
+  },
+  {
+    "timestamp": "2026-06-03 12:00:00",
+    "member": "Oliver",
+    "ticker": "NVDA",
+    "action": "BUY",
+    "shares": 2.0,
+    "price": 125.0
+  },
+  {
+    "timestamp": "2026-06-03 12:00:00",
+    "member": "Oliver",
+    "ticker": "AMD",
+    "action": "BUY",
+    "shares": 3.0,
+    "price": 160.0
+  }
+]
