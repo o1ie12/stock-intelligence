@@ -1,6 +1,11 @@
 {
-  "cash": 10000.0,
-  "positions": {},
-  "initial_value": 10000,
-  "last_rebalance": null
+  "cash": 500.0,
+  "positions": {
+    "ASML": 1.5029,
+    "NVDA": 11.9951,
+    "AMD": 4.3233,
+    "TSM": 5.0766
+  },
+  "last_rebalance": "2026-06-04",
+  "initial_value": 10000.0
 }

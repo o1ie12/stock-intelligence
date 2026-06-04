@@ -14,4 +14,5 @@ build/
 .DS_Store
 venv/
 .venv/
+.env
 

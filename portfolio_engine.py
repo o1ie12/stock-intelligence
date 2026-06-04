@@ -11,8 +11,12 @@ import pandas as pd
 import yfinance as yf
 
 from model import build_signals
+from database import supabase, MEMBERS_TABLE, PORTFOLIOS_TABLE, MODEL_PORTFOLIO_TABLE
+from database import PORTFOLIO_HISTORY_TABLE, TRADE_JOURNAL_TABLE
+from database import MODEL_HISTORY_TABLE, MODEL_CHANGES_TABLE
 
 
+# File paths (kept for backwards compatibility/fallback)
 PORTFOLIO_FILE = Path(__file__).with_name("portfolio.json")
 CLUB_MEMBERS_FILE = Path(__file__).with_name("club_members.json")
 CLUB_PORTFOLIOS_FILE = Path(__file__).with_name("club_portfolios.json")
@@ -411,50 +415,117 @@ def generate_trade_recommendations(
 # ==========================================
 
 def load_club_portfolios() -> dict[str, dict[str, Any]]:
-    if not CLUB_PORTFOLIOS_FILE.exists():
-        return {}
+    """Load club portfolios from Supabase."""
     try:
-        return json.loads(CLUB_PORTFOLIOS_FILE.read_text())
-    except Exception:
+        response = supabase.table(PORTFOLIOS_TABLE).select("*").execute()
+        portfolios = {}
+        for portfolio in response.data:
+            username_response = supabase.table(MEMBERS_TABLE).select("username").eq("id", portfolio["member_id"]).execute()
+            if username_response.data:
+                username = username_response.data[0]["username"]
+                portfolios[username] = {
+                    "cash": float(portfolio["cash"]),
+                    "holdings": portfolio["holdings"]
+                }
+        return portfolios
+    except Exception as e:
+        print(f"Error loading portfolios from Supabase: {e}")
         return {}
 
 
 def save_club_portfolios(portfolios: dict[str, dict[str, Any]]) -> None:
-    CLUB_PORTFOLIOS_FILE.write_text(json.dumps(portfolios, indent=2))
+    """Save club portfolios to Supabase."""
+    try:
+        for username, data in portfolios.items():
+            # Get member ID
+            member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+            if not member_response.data:
+                print(f"Member {username} not found, skipping portfolio save")
+                continue
+            
+            member_id = member_response.data[0]["id"]
+            
+            # Check if portfolio exists
+            existing = supabase.table(PORTFOLIOS_TABLE).select("*").eq("member_id", member_id).execute()
+            
+            portfolio_data = {
+                "member_id": member_id,
+                "cash": float(data.get("cash", 0.0)),
+                "holdings": data.get("holdings", {})
+            }
+            
+            if existing.data:
+                # Update existing portfolio
+                supabase.table(PORTFOLIOS_TABLE).update(portfolio_data).eq("member_id", member_id).execute()
+            else:
+                # Insert new portfolio
+                supabase.table(PORTFOLIOS_TABLE).insert(portfolio_data).execute()
+    except Exception as e:
+        print(f"Error saving portfolios to Supabase: {e}")
 
 
 def load_user_portfolio(username: str) -> PortfolioState:
-    portfolios = load_club_portfolios()
-    if username not in portfolios:
-        # Backward compatibility fallback: seed Oliver with default portfolio.json if available
-        if username.lower() == "oliver":
-            default_path = Path(__file__).parent / "portfolio.json"
-            if default_path.exists():
-                try:
-                    state = load_portfolio(default_path)
-                    save_user_portfolio(username, state)
-                    return state
-                except Exception:
-                    pass
-        # Default starting configuration for new users
-        state = PortfolioState(cash=10000.0, holdings={})
-        save_user_portfolio(username, state)
-        return state
-
-    user_data = portfolios[username]
-    return PortfolioState(
-        cash=float(user_data.get("cash", 0.0)),
-        holdings=normalize_holdings(user_data.get("holdings", {})),
-    )
+    """Load user portfolio directly from Supabase."""
+    try:
+        # Get member ID
+        member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        if not member_response.data:
+            # Create new member and portfolio
+            create_member_profile(username, 10000.0)
+            member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        
+        member_id = member_response.data[0]["id"]
+        
+        # Get portfolio
+        portfolio_response = supabase.table(PORTFOLIOS_TABLE).select("*").eq("member_id", member_id).execute()
+        if not portfolio_response.data:
+            # Create default portfolio
+            state = PortfolioState(cash=10000.0, holdings={})
+            save_user_portfolio(username, state)
+            return state
+        
+        portfolio = portfolio_response.data[0]
+        return PortfolioState(
+            cash=float(portfolio.get("cash", 0.0)),
+            holdings=normalize_holdings(portfolio.get("holdings", {})),
+        )
+    except Exception as e:
+        print(f"Error loading user portfolio from Supabase: {e}")
+        return PortfolioState(cash=10000.0, holdings={})
 
 
 def save_user_portfolio(username: str, state: PortfolioState) -> None:
-    portfolios = load_club_portfolios()
-    portfolios[username] = {
-        "cash": float(state.cash),
-        "holdings": normalize_holdings(state.holdings)
-    }
-    save_club_portfolios(portfolios)
+    """Save user portfolio directly to Supabase."""
+    try:
+        # Get member ID
+        member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        if not member_response.data:
+            # Create member first
+            supabase.table(MEMBERS_TABLE).insert({
+                "username": username,
+                "initial_value": 10000.0
+            }).execute()
+            member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        
+        member_id = member_response.data[0]["id"]
+        
+        # Check if portfolio exists
+        existing = supabase.table(PORTFOLIOS_TABLE).select("*").eq("member_id", member_id).execute()
+        
+        portfolio_data = {
+            "member_id": member_id,
+            "cash": float(state.cash),
+            "holdings": normalize_holdings(state.holdings)
+        }
+        
+        if existing.data:
+            # Update existing portfolio
+            supabase.table(PORTFOLIOS_TABLE).update(portfolio_data).eq("member_id", member_id).execute()
+        else:
+            # Insert new portfolio
+            supabase.table(PORTFOLIOS_TABLE).insert(portfolio_data).execute()
+    except Exception as e:
+        print(f"Error saving user portfolio to Supabase: {e}")
 
 
 # ==========================================
@@ -462,16 +533,41 @@ def save_user_portfolio(username: str, state: PortfolioState) -> None:
 # ==========================================
 
 def load_club_members_config() -> dict[str, dict[str, Any]]:
-    if not CLUB_MEMBERS_FILE.exists():
-        return {}
+    """Load club members configuration from Supabase."""
     try:
-        return json.loads(CLUB_MEMBERS_FILE.read_text())
-    except Exception:
+        response = supabase.table(MEMBERS_TABLE).select("*").execute()
+        members = {}
+        for member in response.data:
+            members[member["username"]] = {
+                "initial_value": float(member["initial_value"]),
+                "id": member["id"]
+            }
+        return members
+    except Exception as e:
+        print(f"Error loading members from Supabase: {e}")
         return {}
 
 
 def save_club_members_config(config: dict[str, dict[str, Any]]) -> None:
-    CLUB_MEMBERS_FILE.write_text(json.dumps(config, indent=2))
+    """Save club members configuration to Supabase."""
+    try:
+        for username, data in config.items():
+            # Check if member exists
+            existing = supabase.table(MEMBERS_TABLE).select("*").eq("username", username).execute()
+            
+            member_data = {
+                "username": username,
+                "initial_value": float(data.get("initial_value", 10000.0))
+            }
+            
+            if existing.data:
+                # Update existing member
+                supabase.table(MEMBERS_TABLE).update(member_data).eq("username", username).execute()
+            else:
+                # Insert new member
+                supabase.table(MEMBERS_TABLE).insert(member_data).execute()
+    except Exception as e:
+        print(f"Error saving members to Supabase: {e}")
 
 
 def create_member_profile(username: str, initial_value: float = 10000.0) -> None:
@@ -482,11 +578,7 @@ def create_member_profile(username: str, initial_value: float = 10000.0) -> None
 
     portfolios = load_club_portfolios()
     if username not in portfolios:
-        portfolios[username] = {
-            "cash": float(initial_value),
-            "holdings": {}
-        }
-        save_club_portfolios(portfolios)
+        save_user_portfolio(username, PortfolioState(cash=initial_value, holdings={}))
 
     append_portfolio_history(username, PortfolioState(cash=initial_value, holdings={}), prices={})
 
@@ -496,18 +588,34 @@ def create_member_profile(username: str, initial_value: float = 10000.0) -> None
 # ==========================================
 
 def load_model_portfolio() -> dict[str, Any]:
-    """Pure function - only reads, never writes state."""
-    if not MODEL_PORTFOLIO_FILE.exists():
-        # Return default payload without writing (pure function)
-        return {
-            "cash": 10000.0,
-            "positions": {},
-            "last_rebalance": "Never",
-            "initial_value": 10000
-        }
+    """Load model portfolio from Supabase."""
     try:
-        return json.loads(MODEL_PORTFOLIO_FILE.read_text())
-    except Exception:
+        response = supabase.table(MODEL_PORTFOLIO_TABLE).select("*").execute()
+        if response.data:
+            portfolio = response.data[0]
+            return {
+                "cash": float(portfolio.get("cash", 10000.0)),
+                "positions": portfolio.get("positions", {}),
+                "last_rebalance": portfolio.get("last_rebalance", "Never"),
+                "initial_value": float(portfolio.get("initial_value", 10000.0))
+            }
+        else:
+            # Insert default model portfolio
+            default = {
+                "cash": 10000.0,
+                "positions": {},
+                "last_rebalance": "Never",
+                "initial_value": 10000.0
+            }
+            supabase.table(MODEL_PORTFOLIO_TABLE).insert({
+                "cash": default["cash"],
+                "positions": default["positions"],
+                "initial_value": default["initial_value"],
+                "last_rebalance": None
+            }).execute()
+            return default
+    except Exception as e:
+        print(f"Error loading model portfolio from Supabase: {e}")
         return {
             "cash": 10000.0,
             "positions": {},
@@ -517,7 +625,26 @@ def load_model_portfolio() -> dict[str, Any]:
 
 
 def save_model_portfolio(payload: dict[str, Any]) -> None:
-    MODEL_PORTFOLIO_FILE.write_text(json.dumps(payload, indent=2))
+    """Save model portfolio to Supabase."""
+    try:
+        # Check if model portfolio exists
+        existing = supabase.table(MODEL_PORTFOLIO_TABLE).select("*").execute()
+        
+        portfolio_data = {
+            "cash": float(payload.get("cash", 10000.0)),
+            "positions": payload.get("positions", {}),
+            "initial_value": float(payload.get("initial_value", 10000.0)),
+            "last_rebalance": payload.get("last_rebalance")
+        }
+        
+        if existing.data:
+            # Update existing
+            supabase.table(MODEL_PORTFOLIO_TABLE).update(portfolio_data).eq("id", existing.data[0]["id"]).execute()
+        else:
+            # Insert new
+            supabase.table(MODEL_PORTFOLIO_TABLE).insert(portfolio_data).execute()
+    except Exception as e:
+        print(f"Error saving model portfolio to Supabase: {e}")
 
 
 # ==========================================
@@ -613,88 +740,106 @@ def track_model_changes(
     old_total_val: float,
     new_total_val: float,
 ) -> None:
-    changes = []
-    if MODEL_CHANGES_FILE.exists():
-        try:
-            changes = json.loads(MODEL_CHANGES_FILE.read_text())
-        except Exception:
-            pass
+    """Track model changes to Supabase."""
+    try:
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+        old_weights = {}
+        for ticker, shares in old_positions.items():
+            val = shares * old_prices.get(ticker, 0.0)
+            old_weights[ticker] = val / old_total_val if old_total_val > 0 else 0.0
 
-    old_weights = {}
-    for ticker, shares in old_positions.items():
-        val = shares * old_prices.get(ticker, 0.0)
-        old_weights[ticker] = val / old_total_val if old_total_val > 0 else 0.0
+        new_weights = {}
+        for ticker, shares in new_positions.items():
+            val = shares * new_prices.get(ticker, 0.0)
+            new_weights[ticker] = val / new_total_val if new_total_val > 0 else 0.0
 
-    new_weights = {}
-    for ticker, shares in new_positions.items():
-        val = shares * new_prices.get(ticker, 0.0)
-        new_weights[ticker] = val / new_total_val if new_total_val > 0 else 0.0
+        all_tickers = set(old_weights.keys()) | set(new_weights.keys())
 
-    all_tickers = set(old_weights.keys()) | set(new_weights.keys())
-    new_entries = []
+        for ticker in all_tickers:
+            w_old = old_weights.get(ticker, 0.0)
+            w_new = new_weights.get(ticker, 0.0)
 
-    for ticker in all_tickers:
-        w_old = old_weights.get(ticker, 0.0)
-        w_new = new_weights.get(ticker, 0.0)
+            action = None
+            if w_old == 0.0 and w_new > 0.0:
+                action = "ADD"
+            elif w_old > 0.0 and w_new == 0.0:
+                action = "REMOVE"
+            elif w_new > w_old + 0.005:
+                action = "WEIGHT_INCREASE"
+            elif w_old > w_new + 0.005:
+                action = "WEIGHT_DECREASE"
 
-        action = None
-        if w_old == 0.0 and w_new > 0.0:
-            action = "ADD"
-        elif w_old > 0.0 and w_new == 0.0:
-            action = "REMOVE"
-        elif w_new > w_old + 0.005:
-            action = "WEIGHT_INCREASE"
-        elif w_old > w_new + 0.005:
-            action = "WEIGHT_DECREASE"
-
-        if action:
-            new_entries.append({
-                "date": today_str,
-                "action": action,
-                "ticker": ticker
-            })
-
-    if new_entries:
-        changes.extend(new_entries)
-        MODEL_CHANGES_FILE.write_text(json.dumps(changes, indent=2))
+            if action:
+                # Check if change already exists for today
+                existing = supabase.table(MODEL_CHANGES_TABLE).select("*").eq("date", today_str).eq("ticker", ticker).execute()
+                if not existing.data:
+                    supabase.table(MODEL_CHANGES_TABLE).insert({
+                        "date": today_str,
+                        "action": action,
+                        "ticker": ticker
+                    }).execute()
+    except Exception as e:
+        print(f"Error tracking model changes to Supabase: {e}")
 
 
 def load_model_portfolio_history() -> list[dict[str, Any]]:
-    if not MODEL_HISTORY_FILE.exists():
-        return []
+    """Load model portfolio history from Supabase."""
     try:
-        return json.loads(MODEL_HISTORY_FILE.read_text())
-    except Exception:
+        response = supabase.table(MODEL_HISTORY_TABLE).select("*").order("date.desc").execute()
+        return [
+            {
+                "date": record["date"],
+                "portfolio_value": float(record["portfolio_value"]),
+                "return_pct": float(record["return_pct"])
+            }
+            for record in response.data
+        ]
+    except Exception as e:
+        print(f"Error loading model history from Supabase: {e}")
         return []
 
 
 def save_model_portfolio_history(history: list[dict[str, Any]]) -> None:
-    MODEL_HISTORY_FILE.write_text(json.dumps(history, indent=2))
+    """Save model portfolio history to Supabase (bulk operation)."""
+    try:
+        for record in history:
+            # Check if record exists for this date
+            existing = supabase.table(MODEL_HISTORY_TABLE).select("*").eq("date", record["date"]).execute()
+            if not existing.data:
+                supabase.table(MODEL_HISTORY_TABLE).insert({
+                    "date": record["date"],
+                    "portfolio_value": float(record["portfolio_value"]),
+                    "return_pct": float(record["return_pct"])
+                }).execute()
+    except Exception as e:
+        print(f"Error saving model history to Supabase: {e}")
 
 
 def append_model_history(total_value: float, initial_value: float) -> None:
-    history = load_model_portfolio_history()
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    return_pct = ((total_value - initial_value) / initial_value * 100) if initial_value > 0 else 0.0
+    """Append model portfolio history to Supabase."""
+    try:
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        return_pct = ((total_value - initial_value) / initial_value * 100) if initial_value > 0 else 0.0
 
-    found = False
-    for record in history:
-        if record["date"] == today_str:
-            record["portfolio_value"] = round(total_value, 2)
-            record["return_pct"] = round(return_pct, 2)
-            found = True
-            break
-
-    if not found:
-        history.append({
-            "date": today_str,
-            "portfolio_value": round(total_value, 2),
-            "return_pct": round(return_pct, 2)
-        })
-
-    save_model_portfolio_history(history)
+        # Check if record exists for today
+        existing = supabase.table(MODEL_HISTORY_TABLE).select("*").eq("date", today_str).execute()
+        
+        if existing.data:
+            # Update existing record
+            supabase.table(MODEL_HISTORY_TABLE).update({
+                "portfolio_value": round(total_value, 2),
+                "return_pct": round(return_pct, 2)
+            }).eq("date", today_str).execute()
+        else:
+            # Insert new record
+            supabase.table(MODEL_HISTORY_TABLE).insert({
+                "date": today_str,
+                "portfolio_value": round(total_value, 2),
+                "return_pct": round(return_pct, 2)
+            }).execute()
+    except Exception as e:
+        print(f"Error appending model history to Supabase: {e}")
 
 
 # ==========================================
@@ -905,16 +1050,51 @@ def get_leaderboard_data(target_portfolio: pd.DataFrame) -> pd.DataFrame:
 # ==========================================
 
 def load_portfolio_history() -> dict[str, list[dict[str, Any]]]:
-    if not PORTFOLIO_HISTORY_FILE.exists():
-        return {}
+    """Load portfolio history from Supabase."""
     try:
-        return json.loads(PORTFOLIO_HISTORY_FILE.read_text())
-    except Exception:
+        response = supabase.table(PORTFOLIO_HISTORY_TABLE).select("*").execute()
+        history = {}
+        for record in response.data:
+            # Get username from member_id
+            member_response = supabase.table(MEMBERS_TABLE).select("username").eq("id", record["member_id"]).execute()
+            if member_response.data:
+                username = member_response.data[0]["username"]
+                if username not in history:
+                    history[username] = []
+                history[username].append({
+                    "timestamp": record["timestamp"],
+                    "portfolio_value": float(record["portfolio_value"]),
+                    "cash": float(record["cash"]),
+                    "holdings": record["holdings"]
+                })
+        return history
+    except Exception as e:
+        print(f"Error loading portfolio history from Supabase: {e}")
         return {}
 
 
 def save_portfolio_history(history: dict[str, list[dict[str, Any]]]) -> None:
-    PORTFOLIO_HISTORY_FILE.write_text(json.dumps(history, indent=2))
+    """Save portfolio history to Supabase (bulk operation)."""
+    try:
+        for username, records in history.items():
+            # Get member ID
+            member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+            if not member_response.data:
+                continue
+            
+            member_id = member_response.data[0]["id"]
+            
+            # Insert each record
+            for record in records:
+                supabase.table(PORTFOLIO_HISTORY_TABLE).insert({
+                    "member_id": member_id,
+                    "timestamp": record["timestamp"],
+                    "portfolio_value": float(record["portfolio_value"]),
+                    "cash": float(record["cash"]),
+                    "holdings": record["holdings"]
+                }).execute()
+    except Exception as e:
+        print(f"Error saving portfolio history to Supabase: {e}")
 
 
 def append_portfolio_history(
@@ -922,21 +1102,28 @@ def append_portfolio_history(
     state: PortfolioState,
     prices: dict[str, float] | None = None,
 ) -> None:
-    history = load_portfolio_history()
-    if username not in history:
-        history[username] = []
+    """Append portfolio history record to Supabase."""
+    try:
+        # Get member ID
+        member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        if not member_response.data:
+            return
+        
+        member_id = member_response.data[0]["id"]
+        
+        price_map = prices if prices is not None else fetch_current_prices(state.holdings.keys())
+        total_val = calculate_portfolio_value(state, price_map)
 
-    price_map = prices if prices is not None else fetch_current_prices(state.holdings.keys())
-    total_val = calculate_portfolio_value(state, price_map)
-
-    record = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "portfolio_value": round(total_val, 2),
-        "cash": round(state.cash, 2),
-        "holdings": normalize_holdings(state.holdings)
-    }
-    history[username].append(record)
-    save_portfolio_history(history)
+        record = {
+            "member_id": member_id,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "portfolio_value": round(total_val, 2),
+            "cash": round(state.cash, 2),
+            "holdings": normalize_holdings(state.holdings)
+        }
+        supabase.table(PORTFOLIO_HISTORY_TABLE).insert(record).execute()
+    except Exception as e:
+        print(f"Error appending portfolio history to Supabase: {e}")
 
 
 def get_portfolio_history_df(username: str) -> pd.DataFrame:
@@ -956,16 +1143,53 @@ def get_portfolio_history_df(username: str) -> pd.DataFrame:
 # ==========================================
 
 def load_trade_journal() -> list[dict[str, Any]]:
-    if not TRADE_JOURNAL_FILE.exists():
-        return []
+    """Load trade journal from Supabase."""
     try:
-        return json.loads(TRADE_JOURNAL_FILE.read_text())
-    except Exception:
+        response = supabase.table(TRADE_JOURNAL_TABLE).select("*").execute()
+        journal = []
+        for record in response.data:
+            # Get username from member_id
+            member_response = supabase.table(MEMBERS_TABLE).select("username").eq("id", record["member_id"]).execute()
+            if member_response.data:
+                username = member_response.data[0]["username"]
+                journal.append({
+                    "timestamp": record["timestamp"],
+                    "member": username,
+                    "ticker": record["ticker"],
+                    "action": record["action"],
+                    "shares": float(record["shares"]),
+                    "price": float(record["price"])
+                })
+        return journal
+    except Exception as e:
+        print(f"Error loading trade journal from Supabase: {e}")
         return []
 
 
 def save_trade_journal(journal: list[dict[str, Any]]) -> None:
-    TRADE_JOURNAL_FILE.write_text(json.dumps(journal, indent=2))
+    """Save trade journal to Supabase (bulk operation)."""
+    try:
+        for trade in journal:
+            # Get member ID
+            member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", trade["member"]).execute()
+            if not member_response.data:
+                continue
+            
+            member_id = member_response.data[0]["id"]
+            
+            # Check if trade exists to avoid duplicates
+            existing = supabase.table(TRADE_JOURNAL_TABLE).select("*").eq("timestamp", trade["timestamp"]).eq("ticker", trade["ticker"]).execute()
+            if not existing.data:
+                supabase.table(TRADE_JOURNAL_TABLE).insert({
+                    "member_id": member_id,
+                    "timestamp": trade["timestamp"],
+                    "ticker": trade["ticker"],
+                    "action": trade["action"],
+                    "shares": float(trade["shares"]),
+                    "price": float(trade["price"])
+                }).execute()
+    except Exception as e:
+        print(f"Error saving trade journal to Supabase: {e}")
 
 
 def log_trades_if_any(
@@ -974,34 +1198,40 @@ def log_trades_if_any(
     new_state: PortfolioState,
     prices: dict[str, float],
 ) -> None:
-    old_holdings = normalize_holdings(old_state.holdings)
-    new_holdings = normalize_holdings(new_state.holdings)
+    """Log trades to Supabase."""
+    try:
+        # Get member ID
+        member_response = supabase.table(MEMBERS_TABLE).select("id").eq("username", username).execute()
+        if not member_response.data:
+            return
+        
+        member_id = member_response.data[0]["id"]
+        
+        old_holdings = normalize_holdings(old_state.holdings)
+        new_holdings = normalize_holdings(new_state.holdings)
 
-    all_tickers = set(old_holdings.keys()) | set(new_holdings.keys())
-    trades: list[dict[str, Any]] = []
+        all_tickers = set(old_holdings.keys()) | set(new_holdings.keys())
 
-    for ticker in all_tickers:
-        old_shares = old_holdings.get(ticker, 0.0)
-        new_shares = new_holdings.get(ticker, 0.0)
-        diff = new_shares - old_shares
+        for ticker in all_tickers:
+            old_shares = old_holdings.get(ticker, 0.0)
+            new_shares = new_holdings.get(ticker, 0.0)
+            diff = new_shares - old_shares
 
-        if abs(diff) > 1e-6:
-            action = "BUY" if diff > 0 else "SELL"
-            shares = abs(diff)
-            price = prices.get(ticker, 0.0)
-            trades.append({
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "member": username,
-                "ticker": ticker,
-                "action": action,
-                "shares": round(shares, 4),
-                "price": round(price, 2)
-            })
-
-    if trades:
-        journal = load_trade_journal()
-        journal.extend(trades)
-        save_trade_journal(journal)
+            if abs(diff) > 1e-6:
+                action = "BUY" if diff > 0 else "SELL"
+                shares = abs(diff)
+                price = prices.get(ticker, 0.0)
+                
+                supabase.table(TRADE_JOURNAL_TABLE).insert({
+                    "member_id": member_id,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "ticker": ticker,
+                    "action": action,
+                    "shares": round(shares, 4),
+                    "price": round(price, 2)
+                }).execute()
+    except Exception as e:
+        print(f"Error logging trades to Supabase: {e}")
 
 
 # ==========================================

@@ -48,6 +48,21 @@ The system uses a unified portfolio construction approach to ensure mathematical
 
 - Python 3.8+
 - Virtual environment (recommended)
+- Supabase account (free tier available)
+- Supabase project with database tables created
+
+### Database Setup
+
+1. Create a Supabase account at https://supabase.com
+2. Create a new project
+3. Run the SQL schema in `supabase_schema.sql` in the Supabase SQL Editor
+4. Disable RLS temporarily (run `fix_rls.sql`)
+5. Copy your Project URL and anon key
+6. Create a `.env` file with your credentials:
+   ```
+   SUPABASE_URL=your_project_url
+   SUPABASE_KEY=your_anon_key
+   ```
 
 ### Installation
 
@@ -58,6 +73,17 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install additional dependencies for Supabase
+pip install supabase python-dotenv
+```
+
+### Migration
+
+If you have existing JSON data, migrate it to Supabase:
+
+```bash
+python migrate_to_supabase.py
 ```
 
 ### Running the Application

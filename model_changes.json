@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "date": "2026-06-04",
+    "action": "ADD",
+    "ticker": "NVDA"
+  },
+  {
+    "date": "2026-06-04",
+    "action": "ADD",
+    "ticker": "AMD"
+  },
+  {
+    "date": "2026-06-04",
+    "action": "ADD",
+    "ticker": "TSM"
+  },
+  {
+    "date": "2026-06-04",
+    "action": "ADD",
+    "ticker": "ASML"
+  }
+]
