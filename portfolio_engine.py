@@ -711,7 +711,7 @@ def rebalance_model_portfolio() -> None:
 def load_model_changes() -> list[dict[str, Any]]:
     """Load model changes from Supabase."""
     try:
-        response = supabase.table(MODEL_CHANGES_TABLE).select("*").order("date", desc=True).execute()
+        response = supabase.table(MODEL_CHANGES_TABLE).select("*").order(column="date", desc=True).execute()
         return [
             {
                 "date": record["date"],
@@ -779,7 +779,7 @@ def track_model_changes(
 def load_model_portfolio_history() -> list[dict[str, Any]]:
     """Load model portfolio history from Supabase."""
     try:
-        response = supabase.table(MODEL_HISTORY_TABLE).select("*").order("date", desc=True).execute()
+        response = supabase.table(MODEL_HISTORY_TABLE).select("*").order(column="date", desc=True).execute()
         return [
             {
                 "date": record["date"],

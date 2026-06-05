@@ -5,20 +5,42 @@ from supabase import create_client, Client
 # Try loading from .env first (for local development)
 load_dotenv()
 
-# Try Streamlit secrets (for cloud deployment)
-try:
-    import streamlit as st
-    supabase_url = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL"))
-    supabase_key = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY"))
-except ImportError:
-    # Streamlit not available, fallback to .env
+# Lazy initialization - don't access streamlit.secrets during module import
+_supabase_client: Client | None = None
+
+def get_supabase_client() -> Client:
+    """Get or create the Supabase client with lazy initialization."""
+    global _supabase_client
+    
+    if _supabase_client is not None:
+        return _supabase_client
+    
+    # Get Supabase credentials from environment variables
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_KEY")
+    
+    # If not in environment, try Streamlit secrets
+    if not supabase_url or not supabase_key:
+        try:
+            import streamlit as st
+            supabase_url = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL"))
+            supabase_key = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY"))
+        except (ImportError, AttributeError):
+            pass
+    
+    if not supabase_url or not supabase_key:
+        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in .env file or secrets.toml")
+    
+    _supabase_client = create_client(supabase_url, supabase_key)
+    return _supabase_client
 
-if not supabase_url or not supabase_key:
-    raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in .env file or secrets.toml")
+# For backward compatibility, create a property-like access
+class _SupabaseProxy:
+    """Proxy to provide lazy access to the supabase client."""
+    def __getattr__(self, name):
+        return getattr(get_supabase_client(), name)
 
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = _SupabaseProxy()
 
 # Table names
 MEMBERS_TABLE = "members"
