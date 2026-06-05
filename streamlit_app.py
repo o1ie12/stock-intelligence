@@ -65,15 +65,22 @@ if not members_list:
     members_list = sorted(list(config.keys()))
 
 if "active_member" not in st.session_state:
-    st.session_state.active_member = "Oliver" if "Oliver" in members_list else members_list[0]
+    if members_list:
+        st.session_state.active_member = "Oliver" if "Oliver" in members_list else members_list[0]
+    else:
+        st.session_state.active_member = "Oliver"
 
-active_member = st.sidebar.selectbox(
-    "Active Club Member",
-    members_list,
-    index=members_list.index(st.session_state.active_member) if st.session_state.active_member in members_list else 0,
-    key="active_member_selector",
-)
-st.session_state.active_member = active_member
+if members_list:
+    active_member = st.sidebar.selectbox(
+        "Active Club Member",
+        members_list,
+        index=members_list.index(st.session_state.active_member) if st.session_state.active_member in members_list else 0,
+        key="active_member_selector",
+    )
+    st.session_state.active_member = active_member
+else:
+    st.sidebar.error("No members found. Please add a member to continue.")
+    st.session_state.active_member = None
 
 st.sidebar.divider()
 
