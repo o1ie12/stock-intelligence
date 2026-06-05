@@ -16,16 +16,10 @@ from database import PORTFOLIO_HISTORY_TABLE, TRADE_JOURNAL_TABLE
 from database import MODEL_HISTORY_TABLE, MODEL_CHANGES_TABLE
 
 
-# File paths (kept for backwards compatibility/fallback)
-PORTFOLIO_FILE = Path(__file__).with_name("portfolio.json")
-CLUB_MEMBERS_FILE = Path(__file__).with_name("club_members.json")
-CLUB_PORTFOLIOS_FILE = Path(__file__).with_name("club_portfolios.json")
-PORTFOLIO_HISTORY_FILE = Path(__file__).with_name("portfolio_history.json")
-TRADE_JOURNAL_FILE = Path(__file__).with_name("trade_journal.json")
-
-MODEL_PORTFOLIO_FILE = Path(__file__).with_name("model_portfolio.json")
-MODEL_HISTORY_FILE = Path(__file__).with_name("model_portfolio_history.json")
-MODEL_CHANGES_FILE = Path(__file__).with_name("model_changes.json")
+# File paths removed - Supabase is now the sole source of truth
+# Previously: PORTFOLIO_FILE, CLUB_MEMBERS_FILE, CLUB_PORTFOLIOS_FILE, 
+# PORTFOLIO_HISTORY_FILE, TRADE_JOURNAL_FILE, MODEL_PORTFOLIO_FILE, 
+# MODEL_HISTORY_FILE, MODEL_CHANGES_FILE
 
 CASH_LABEL = "CASH"
 MAX_HOLDINGS = 5
@@ -370,24 +364,6 @@ def analyze_portfolio(
         "health": health,
         "decision_summary": summary,
     }
-
-
-def save_portfolio(state: PortfolioState, path: str | Path = PORTFOLIO_FILE) -> None:
-    payload = {"cash": float(state.cash), "holdings": normalize_holdings(state.holdings)}
-    Path(path).write_text(json.dumps(payload, indent=2))
-
-
-def load_portfolio(path: str | Path = PORTFOLIO_FILE) -> PortfolioState:
-    portfolio_path = Path(path)
-
-    if not portfolio_path.exists():
-        return PortfolioState(cash=5000.0, holdings={"NVDA": 10, "AMD": 15})
-
-    payload = json.loads(portfolio_path.read_text())
-    return PortfolioState(
-        cash=float(payload.get("cash", 0.0)),
-        holdings=normalize_holdings(payload.get("holdings", {})),
-    )
 
 
 def generate_trade_recommendations(

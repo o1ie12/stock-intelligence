@@ -102,10 +102,21 @@ if st.sidebar.button("Register Member Profile"):
 
 
 # ==========================================
-# SHARED DATA
+# SHARED DATA (with caching for performance)
 # ==========================================
-signals_df = build_signals().sort_values("Score", ascending=False)
-target_weights_df = construct_target_portfolio()
+
+@st.cache_data(ttl=3600)  # Cache signals for 1 hour (signals based on 6-month trends, acceptable staleness)
+def get_cached_signals():
+    """Cached signal generation to reduce yfinance API calls."""
+    return build_signals()
+
+@st.cache_data(ttl=3600)  # Cache target portfolio for 1 hour (derived from cached signals)
+def get_cached_target_portfolio():
+    """Cached target portfolio construction."""
+    return construct_target_portfolio()
+
+signals_df = get_cached_signals().sort_values("Score", ascending=False)
+target_weights_df = get_cached_target_portfolio()
 leaderboard_df = get_leaderboard_data(target_weights_df)
 
 
