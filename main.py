@@ -1,7 +1,12 @@
 import yfinance as yf
 import pandas as pd
+from universe_config import get_universe, DEFAULT_UNIVERSE
 
-stocks = ["NVDA", "AMD", "TSM", "ASML"]
+# Configuration
+UNIVERSE_TYPE = DEFAULT_UNIVERSE  # Can be "sp500", "semiconductor", or "custom"
+
+# Get universe from configuration
+stocks = get_universe(UNIVERSE_TYPE)
 
 data = []
 

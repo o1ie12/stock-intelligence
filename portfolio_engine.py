@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from model import build_signals
+from model import build_signals, build_signals_legacy, fetch_stock
+from universe_config import get_universe, DEFAULT_UNIVERSE
 from database import supabase, MEMBERS_TABLE, PORTFOLIOS_TABLE, MODEL_PORTFOLIO_TABLE
 from database import PORTFOLIO_HISTORY_TABLE, TRADE_JOURNAL_TABLE
 from database import MODEL_HISTORY_TABLE, MODEL_CHANGES_TABLE
@@ -112,6 +113,7 @@ def build_shared_portfolio(
     max_holdings: int = MAX_HOLDINGS,
     max_position: float = MAX_POSITION,
     min_position: float = MIN_POSITION,
+    universe_type: str = DEFAULT_UNIVERSE,
 ) -> pd.DataFrame:
     """
     Unified portfolio construction function for all systems.
@@ -123,32 +125,30 @@ def build_shared_portfolio(
     - Backtests
     
     Args:
-        tickers: List of stock tickers to consider
+        tickers: List of stock tickers to consider (if None, uses universe from config)
         cash_reserve: Percentage of portfolio to hold in cash (default 5%)
         max_holdings: Maximum number of positions (default 5)
         max_position: Maximum weight per position (default 35%)
         min_position: Minimum weight per position (default 5%)
+        universe_type: Type of universe to use (default from config)
     
     Returns:
         DataFrame with columns: Ticker, Score, Target Weight
     """
-    from model import build_signals
-    
-    # For backtest compatibility, we need to handle different universes
-    # If tickers are provided, we need to fetch signals for those specific tickers
-    # But build_signals() uses a fixed universe, so we need to handle this
-    
-    # Get signals from model
-    signals_df = build_signals()
+    # Get signals from model using the new interface
+    try:
+        signals_df, stats = build_signals(universe_type=universe_type)
+    except:
+        # Fallback to legacy interface for backward compatibility
+        signals_df = build_signals_legacy()
     
     # If specific tickers provided and they differ from model universe,
     # we need to handle this for backtest compatibility
     model_tickers = set(signals_df["Ticker"].values)
-    provided_tickers = set(tickers)
+    provided_tickers = set(tickers) if tickers else None
     
-    if provided_tickers != model_tickers:
+    if provided_tickers and provided_tickers != model_tickers:
         # For backtest with larger universe, fetch signals for provided tickers
-        from model import fetch_stock
         signal_data = []
         for ticker in provided_tickers:
             try:
@@ -216,15 +216,18 @@ def construct_target_portfolio(
     max_holdings: int = MAX_HOLDINGS,
     max_position: float = MAX_POSITION,
     min_position: float = MIN_POSITION,
+    universe_type: str = DEFAULT_UNIVERSE,
 ) -> pd.DataFrame:
     """Uses shared portfolio construction for live system compatibility."""
-    from model import stocks as model_stocks
+    # Get universe from configuration
+    model_stocks = get_universe(universe_type)
     return build_shared_portfolio(
         tickers=model_stocks,
         cash_reserve=cash_reserve,
         max_holdings=max_holdings,
         max_position=max_position,
-        min_position=min_position
+        min_position=min_position,
+        universe_type=universe_type
     )
 
 
@@ -375,11 +378,20 @@ def generate_trade_recommendations(
     state = PortfolioState(cash=cash, holdings=holdings)
     analysis = analyze_portfolio(state, min_trade_value, cash_reserve)
 
+    # Get signals using the new interface
+    try:
+        signals, signal_stats = build_signals()
+    except:
+        # Fallback to legacy interface
+        signals = build_signals_legacy()
+        signal_stats = {}
+    
     return {
         "portfolio_value": analysis["health"]["total_value"],
         "cash": float(cash),
         "prices": analysis["prices"],
-        "signals": build_signals(),
+        "signals": signals,
+        "signal_stats": signal_stats,
         "target_weights": analysis["target_allocation"],
         "holdings": analysis["current_allocation"],
         "trades": analysis["trade_plan"],

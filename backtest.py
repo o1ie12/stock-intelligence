@@ -3,18 +3,13 @@ import yfinance as yf
 
 from model import fetch_stock
 from portfolio_engine import build_shared_portfolio
+from universe_config import get_universe, DEFAULT_UNIVERSE
 
+# Configuration
+UNIVERSE_TYPE = DEFAULT_UNIVERSE  # Can be "sp500", "semiconductor", or "custom"
 
-stocks = [
-    "NVDA", "AMD", "MSFT", "AAPL", "GOOG", "AMZN",
-    "TSM", "ASML", "INTC", "QCOM", "AVGO",
-    "JPM", "GS", "BAC",
-    "COST", "WMT", "NKE", "HD", "MCD",
-    "CAT", "BA", "GE",
-    "XOM", "CVX", "COP",
-    "JNJ", "UNH", "PFE", "MRK",
-    "V", "MA", "DIS",
-]
+# Get universe from configuration
+stocks = get_universe(UNIVERSE_TYPE)
 
 benchmark = "SPY"
 
