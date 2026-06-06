@@ -163,13 +163,23 @@ The Stock Intelligence System is deployed on **Streamlit Cloud** with **Supabase
 
 ## **Stock Universe**
 
-The current implementation uses a focused universe of 4 semiconductor stocks:
-- NVDA (NVIDIA)
-- AMD (Advanced Micro Devices)
-- TSM (Taiwan Semiconductor)
-- ASML (ASML Holding)
+The system uses a configurable universe architecture managed through `universe_config.py`:
 
-*Note: The backtest system uses a larger 32-stock multi-sector universe for validation purposes.*
+**Available Universes:**
+- **S&P 500** (default): Approximately 280 major S&P 500 constituents across all sectors
+- **Semiconductor**: Original 4-stock universe (NVDA, AMD, TSM, ASML) for testing
+- **Custom**: Placeholder for custom universe definitions
+
+**Configuration:** The universe type is controlled by the `DEFAULT_UNIVERSE` variable in `universe_config.py`. Individual files can override this setting if needed.
+
+**Robust Error Handling:** The system includes comprehensive error handling for:
+- Missing PE values (filled with 999 for ranking)
+- Missing ROE values (filled with 0)
+- API failures (retry logic with exponential backoff)
+- Delisted symbols (automatically detected and excluded)
+- Insufficient data (stocks with <2 data points excluded)
+
+**Performance:** S&P 500 universe processes ~260 successfully scored stocks in ~150 seconds with detailed execution reporting.
 
 ---
 
@@ -208,6 +218,7 @@ stock-intelligence/
 ├── backtest.py              # Historical backtesting
 ├── streamlit_app.py         # Dashboard interface
 ├── model_validation.py      # Comprehensive factor analysis
+├── universe_config.py       # Universe configuration management
 ├── database.py              # Supabase database connection
 ├── requirements.txt         # Python dependencies
 ├── supabase_schema.sql      # Database table definitions
@@ -224,6 +235,21 @@ stock-intelligence/
 ---
 
 ## **Recent Updates**
+
+### **Phase 4: S&P 500 Universe Expansion**
+
+**Achievements:**
+- Expanded from 4-stock semiconductor universe to configurable S&P 500 system (~280 stocks)
+- Created dedicated universe configuration module (`universe_config.py`)
+- Implemented robust error handling for missing data, API failures, and delisted symbols
+- Added comprehensive execution reporting and benchmarking
+- Preserved all original factor weights and portfolio construction methodology
+- Maintained backward compatibility with legacy function calls
+
+**Performance:**
+- S&P 500 universe: ~150 seconds runtime, 93% success rate (261/280 stocks)
+- Semiconductor universe: ~2 seconds runtime, 100% success rate (4/4 stocks)
+- Detailed reporting on excluded stocks by category (missing PE, missing ROE, API failures, insufficient data)
 
 ### **Phase 3: Cloud Database Integration & Multi-User Deployment**
 
