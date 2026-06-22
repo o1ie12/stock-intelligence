@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-from model import build_signals
+from model import build_signals, build_signals_legacy
 from portfolio_engine import (
     CASH_LABEL,
     PortfolioState,
@@ -115,7 +115,7 @@ if st.sidebar.button("Register Member Profile"):
 @st.cache_data(ttl=3600)  # Cache signals for 1 hour (signals based on 6-month trends, acceptable staleness)
 def get_cached_signals():
     """Cached signal generation to reduce yfinance API calls."""
-    return build_signals()
+    return build_signals_legacy()
 
 @st.cache_data(ttl=3600)  # Cache target portfolio for 1 hour (derived from cached signals)
 def get_cached_target_portfolio():
